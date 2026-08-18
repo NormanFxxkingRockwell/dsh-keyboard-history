@@ -39,7 +39,9 @@ node scripts/install-profile.mjs <profileName> <pluginPath>
 
 脚本会向 profile 的 `package.json` 写入依赖（`file:` 指向本仓库）并加入
 `dsh.profile.bundles`，然后执行安装。**之后需要重启对应 `dsh web` 实例**——
-client bundle 只在启动时进入模块图。
+client bundle 只在启动时进入模块图。注意：实例运行期间 pnpm 可能因其它包
+（如 harmonyos-dev-mcp-for-dsh）被进程占用而报 `EPERM`，安装请在实例停止后
+进行。
 
 发布到 npm / GitHub 后，把依赖改成对应来源即可（同一 bundle 机制）。
 
