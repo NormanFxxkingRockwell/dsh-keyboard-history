@@ -14,23 +14,20 @@ Pure ↑/↓ input-history for the DeepSeek Harness web composer. Nothing else.
 ## 安装 / Install
 
 ```sh
-npm install dsh-keyboard-history
+# 官方方式：解析 npm 包、安装并自动并入 profile bundles
+dsh plugin --profile <profileName> add dsh-keyboard-history
+# 例如：dsh plugin --profile web add dsh-keyboard-history
 ```
 
-把 `dsh-keyboard-history` 加入 profile 的 `package.json`（`dependencies` + `dsh.profile.bundles`），然后：
+然后重启 `dsh web`（client bundle 在启动时进入模块图）。
 
-```sh
-# 在 ~/.dsh/profiles/<profile> 下执行一次安装，再重启 dsh web
-pnpm install
-```
-
-本地开发可用仓库内脚本一键接线（`file:` 依赖，支持 `DSH_HOME`）：
+本地开发（未发布、用 `file:` 依赖）可用仓库内脚本接线：
 
 ```sh
 node scripts/install-profile.mjs <profileName> <pluginPath>
 ```
 
-> client bundle 只在实例启动时进入模块图，改动后需要重启 `dsh web`；实例运行期间安装可能因其它包被占用报 `EPERM`，请在停止后安装。
+> 实例运行期间安装可能因其它包被占用报 `EPERM`，请在停止后执行。
 
 ## 设计 / Design
 
