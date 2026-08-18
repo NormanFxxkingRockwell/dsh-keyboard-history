@@ -49,13 +49,14 @@ client bundle 只在启动时进入模块图。注意：实例运行期间 pnpm 
 
 ```sh
 npm install        # devDeps: jsdom, react, react-dom
-npm run verify     # jsdom 行为验证：16 项断言
+npm run verify     # jsdom 行为验证：24 项断言
 ```
 
 验证挂载真实的 `lib/client.js` bundle 到 jsdom，模拟会话标准套件并以真实
 DOM `KeyboardEvent` 驱动输入框，覆盖：召回/回翻/前进/越界清空、非空草稿、
 忙碌 phase、IME（isComposing 与 keyCode 229）、修饰键、失焦、历史去重、
-编辑退出翻阅。
+编辑退出翻阅、以及「最老一条时首个 ↓ 立即前进」和「宿主回显规范化
+（尾随空白）不打断翻阅」两组回归场景。
 
 ## 实现 / How it works
 

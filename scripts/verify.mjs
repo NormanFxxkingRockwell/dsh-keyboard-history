@@ -104,6 +104,13 @@ const textarea = window.document.createElement("textarea");
 card.appendChild(textarea);
 window.document.body.appendChild(card);
 
+// generic renderer for any (useSession, useInput, inputActions) kit
+function renderInto(tag, useSessionImpl, useInputImpl, actions) {
+  const root = createRoot(window.document.getElementById("app"));
+  act(() => root.render(React.createElement(Component, { useSession: useSessionImpl, useInput: useInputImpl, inputActions: actions })));
+  return root;
+}
+
 // ---------------------------------------------------------------------------
 // test scaffolding
 // ---------------------------------------------------------------------------
@@ -129,17 +136,12 @@ function setNodes(nodes) {
 function setInput(patch) {
   act(() => inputStore.set({ ...inputStore.get(), ...patch }));
 }
-function render() {
-  const root = createRoot(window.document.getElementById("app"));
-  act(() => root.render(React.createElement(Component, { useSession, useInput, inputActions })));
-  return root;
-}
+const root = renderInto("default", useSession, useInput, inputActions);
 
 // ---------------------------------------------------------------------------
 // tests
 // ---------------------------------------------------------------------------
 console.log("dsh-keyboard-history behavior verification");
-const root = render();
 const draft = () => inputStore.get().draft;
 
 // ── recall basics ──
@@ -210,7 +212,78 @@ setInput({ draft: "after edited" }); // user edits
 press("ArrowDown"); // browsing should have exited; nothing happens
 ok(draft() === "after edited", "edit exits browsing; ↓ does not erase the edit");
 
+// ── ↓ from the OLDEST entry must move newer on the FIRST press ──
+setInput({ draft: "", phase: "plain" });
+setNodes([
+  { kind: "user", content: [{ type: "text", text: "first" }] },
+  { kind: "user", content: [{ type: "text", text: "second" }] },
+  { kind: "user", content: [{ type: "text", text: "third" }] },
+]);
+press("ArrowUp"); // → third (start browsing)
+press("ArrowUp"); // → second
+press("ArrowUp"); // → first (oldest, clamped)
+press("ArrowDown"); // first ↓ from the oldest entry must move to second
+ok(draft() === "second", "↓ from the oldest entry moves newer on the first press");
+press("ArrowDown"); // → third
+ok(draft() === "third", "second ↓ moves to the newest");
+press("ArrowDown"); // past newest → empty
+ok(draft() === "", "third ↓ past the newest restores an empty draft");
+
+// ── host echo normalization must not break browsing (regression) ──
+// The real input machine echoes setDraft verbatim for plain text, but a host
+// that normalizes the echo (e.g. trailing newline) must not kill the browse
+// session or make the first ↓ at the oldest entry a no-op.
 root.unmount();
+const echoStore = makeStore({ draft: "", phase: "plain" });
+const echoNodesStore = makeStore([]);
+function useSessionEcho(sel) {
+  const [v, setV] = React.useState(() => sel({ nodes: echoNodesStore.get() }));
+  React.useEffect(() => echoNodesStore.subscribe(() => setV(sel({ nodes: echoNodesStore.get() }))), []);
+  return v;
+}
+function useInputEcho(sel) {
+  const [v, setV] = React.useState(() => sel(echoStore.get()));
+  React.useEffect(() => echoStore.subscribe(() => setV(sel(echoStore.get()))), []);
+  return v;
+}
+const echoActions = {
+  setDraft(text) {
+    const echo = text === "" ? "" : text + "\n"; // simulated host normalization
+    echoStore.set({ ...echoStore.get(), draft: echo });
+  },
+};
+const echoRoot = renderInto("echo", useSessionEcho, useInputEcho, echoActions);
+const setEchoNodes = (nodes) => act(() => echoNodesStore.set(nodes));
+const setEchoDraft = (text) => act(() => echoStore.set({ ...echoStore.get(), draft: text }));
+const echoDraftRaw = () => echoStore.get().draft;
+const echoDraft = () => echoDraftRaw().replace(/\s+$/, "");
+function echoPress(key) {
+  const ev = new window.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+  textarea.focus();
+  act(() => textarea.dispatchEvent(ev));
+}
+setEchoNodes([
+  { kind: "user", content: [{ type: "text", text: "first" }] },
+  { kind: "user", content: [{ type: "text", text: "second" }] },
+  { kind: "user", content: [{ type: "text", text: "third" }] },
+]);
+setEchoDraft("");
+echoPress("ArrowUp");
+echoPress("ArrowUp");
+echoPress("ArrowUp");
+ok(echoDraft() === "first", "echo: ↑↑↑ still reaches the oldest entry (browse survives trailing-newline echo)");
+echoPress("ArrowDown");
+ok(echoDraft() === "second", "echo: ↓ at the oldest entry moves newer on the FIRST press");
+echoPress("ArrowDown");
+ok(echoDraft() === "third", "echo: second ↓ reaches the newest");
+echoPress("ArrowDown");
+ok(echoDraft() === "", "echo: ↓ past the newest restores an empty draft");
+echoPress("ArrowUp"); // back into browsing at "third"
+setEchoDraft("third edited"); // real user edit, echoed with trailing newline
+echoPress("ArrowDown");
+ok(echoDraft() === "third edited", "echo: a real edit still exits browsing (↓ does not erase it)");
+echoRoot.unmount();
+
 const summary = `${checks - failures}/${checks} checks passed`;
 console.log(failures === 0 ? `✓ ${summary}` : `✗ ${summary}`);
 process.exit(failures === 0 ? 0 : 1);
