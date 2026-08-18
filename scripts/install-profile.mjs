@@ -18,7 +18,8 @@ const profileName = process.argv[2] ?? "web";
 const pluginPath = path.resolve(process.argv[3] ?? repoRoot);
 const pluginName = "dsh-keyboard-history";
 
-const profileDir = path.join(os.homedir(), ".dsh", "profiles", profileName);
+const profileRoot = process.env.DSH_HOME ? path.resolve(process.env.DSH_HOME) : path.join(os.homedir(), ".dsh");
+const profileDir = path.join(profileRoot, "profiles", profileName);
 const pkgPath = path.join(profileDir, "package.json");
 if (!fs.existsSync(pkgPath)) {
   console.error(`profile not found: ${pkgPath}`);
