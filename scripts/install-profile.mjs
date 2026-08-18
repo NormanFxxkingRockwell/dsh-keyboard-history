@@ -46,7 +46,6 @@ if (!pkg.dsh.profile.bundles.includes(pluginName)) {
 fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf8");
 console.log(`updated ${pkgPath}`);
 
-const tool = process.platform === "win32" ? "" : "";
 const hasPnpm = (() => { try { execSync("pnpm --version", { stdio: "ignore" }); return true; } catch { return false; } })();
 const cmd = hasPnpm ? "pnpm install" : "npm install --no-package-lock";
 console.log(`installing with: ${cmd}`);

@@ -110,7 +110,7 @@ card.appendChild(textarea);
 window.document.body.appendChild(card);
 
 // generic renderer for any (useSession, useInput, inputActions) kit
-function renderInto(tag, useSessionImpl, useInputImpl, actions, extra = {}) {
+function renderInto(useSessionImpl, useInputImpl, actions, extra = {}) {
   const root = createRoot(window.document.getElementById("app"));
   act(() => root.render(React.createElement(Component, { useSession: useSessionImpl, useInput: useInputImpl, inputActions: actions, ...extra })));
   return root;
@@ -141,7 +141,7 @@ function setNodes(nodes) {
 function setInput(patch) {
   act(() => inputStore.set({ ...inputStore.get(), ...patch }));
 }
-const root = renderInto("default", useSession, useInput, inputActions);
+const root = renderInto(useSession, useInput, inputActions);
 
 // ---------------------------------------------------------------------------
 // tests
@@ -257,7 +257,7 @@ const echoActions = {
     echoStore.set({ ...echoStore.get(), draft: echo });
   },
 };
-const echoRoot = renderInto("echo", useSessionEcho, useInputEcho, echoActions);
+const echoRoot = renderInto(useSessionEcho, useInputEcho, echoActions);
 const setEchoNodes = (nodes) => act(() => echoNodesStore.set(nodes));
 const setEchoDraft = (text) => act(() => echoStore.set({ ...echoStore.get(), draft: text }));
 const echoDraftRaw = () => echoStore.get().draft;
@@ -293,7 +293,7 @@ echoRoot.unmount();
 let loadOlderCalls = 0;
 const loadHistoryOlder = () => { loadOlderCalls += 1; };
 const setHasMore = (flag) => act(() => hasMoreStore.set(flag));
-const winRoot = renderInto("window", useSession, useInput, inputActions, { loadHistoryOlder });
+const winRoot = renderInto(useSession, useInput, inputActions, { loadHistoryOlder });
 setHasMore(false);
 setNodes([
   { kind: "user", content: [{ type: "text", text: "m3" }] },
