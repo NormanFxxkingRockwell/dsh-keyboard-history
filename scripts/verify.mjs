@@ -77,10 +77,15 @@ function makeStore(initial) {
 
 const inputStore = makeStore({ draft: "", phase: "plain" });
 const nodesStore = makeStore([]); // simulated ConversationSnapshot.nodes
+const hasMoreStore = makeStore(false); // simulated window paging flag
 
 function useSession(selector) {
-  const [v, setV] = React.useState(() => selector({ nodes: nodesStore.get() }));
-  React.useEffect(() => nodesStore.subscribe(() => setV(selector({ nodes: nodesStore.get() }))), []);
+  const [v, setV] = React.useState(() => selector({ nodes: nodesStore.get(), hasMore: hasMoreStore.get() }));
+  React.useEffect(() => {
+    const off1 = nodesStore.subscribe(() => setV(selector({ nodes: nodesStore.get(), hasMore: hasMoreStore.get() })));
+    const off2 = hasMoreStore.subscribe(() => setV(selector({ nodes: nodesStore.get(), hasMore: hasMoreStore.get() })));
+    return () => { off1(); off2(); };
+  }, []);
   return v;
 }
 function useInput(selector) {
@@ -105,9 +110,9 @@ card.appendChild(textarea);
 window.document.body.appendChild(card);
 
 // generic renderer for any (useSession, useInput, inputActions) kit
-function renderInto(tag, useSessionImpl, useInputImpl, actions) {
+function renderInto(tag, useSessionImpl, useInputImpl, actions, extra = {}) {
   const root = createRoot(window.document.getElementById("app"));
-  act(() => root.render(React.createElement(Component, { useSession: useSessionImpl, useInput: useInputImpl, inputActions: actions })));
+  act(() => root.render(React.createElement(Component, { useSession: useSessionImpl, useInput: useInputImpl, inputActions: actions, ...extra })));
   return root;
 }
 
@@ -283,6 +288,47 @@ setEchoDraft("third edited"); // real user edit, echoed with trailing newline
 echoPress("ArrowDown");
 ok(echoDraft() === "third edited", "echo: a real edit still exits browsing (↓ does not erase it)");
 echoRoot.unmount();
+
+// ── windowed sessions: ↑ at the window's oldest auto-pages older history ──
+let loadOlderCalls = 0;
+const loadHistoryOlder = () => { loadOlderCalls += 1; };
+const setHasMore = (flag) => act(() => hasMoreStore.set(flag));
+const winRoot = renderInto("window", useSession, useInput, inputActions, { loadHistoryOlder });
+setHasMore(false);
+setNodes([
+  { kind: "user", content: [{ type: "text", text: "m3" }] },
+  { kind: "user", content: [{ type: "text", text: "m4" }] },
+  { kind: "user", content: [{ type: "text", text: "m5" }] },
+]);
+setInput({ draft: "", phase: "plain" });
+setHasMore(true); // older pages (m1, m2) exist but are not materialized yet
+press("ArrowUp"); // → m5
+press("ArrowUp"); // → m4
+ok(draft() === "m4", "window: ↑ walks older inside the loaded window");
+press("ArrowUp"); // → m3 (oldest materialized)
+ok(draft() === "m3" && loadOlderCalls === 0, "window: reaches the window's oldest without paging");
+press("ArrowUp"); // at oldest + hasMore → requests the older page, stays put
+ok(loadOlderCalls === 1 && draft() === "m3", "window: ↑ at the oldest requests the older page and stays");
+// the host prepends the older page (m1, m2) and clears hasMore
+act(() => {
+  nodesStore.set([
+    { kind: "user", content: [{ type: "text", text: "m1" }] },
+    { kind: "user", content: [{ type: "text", text: "m2" }] },
+    { kind: "user", content: [{ type: "text", text: "m3" }] },
+    { kind: "user", content: [{ type: "text", text: "m4" }] },
+    { kind: "user", content: [{ type: "text", text: "m5" }] },
+  ]);
+  hasMoreStore.set(false);
+});
+press("ArrowUp");
+ok(draft() === "m2", "window: ↑ after the page lands enters the older region (re-anchored)");
+press("ArrowUp");
+ok(draft() === "m1", "window: second ↑ reaches the now-oldest page");
+press("ArrowUp");
+ok(loadOlderCalls === 1 && draft() === "m1", "window: no more paging when the log is fully loaded");
+press("ArrowDown");
+ok(draft() === "m2", "window: ↓ still walks newer after paging");
+winRoot.unmount();
 
 const summary = `${checks - failures}/${checks} checks passed`;
 console.log(failures === 0 ? `✓ ${summary}` : `✗ ${summary}`);
