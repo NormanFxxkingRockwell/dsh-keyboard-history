@@ -1,6 +1,6 @@
 {
   "name": "dsh-keyboard-history",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Pure ↑/↓ input history for the DSH web composer: recall previously sent messages with arrow keys. Nothing else.",
   "type": "module",
   "main": "lib/index.js",
